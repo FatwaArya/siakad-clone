@@ -1,7 +1,6 @@
-const { restart } = require('nodemon')
 const User = require('../models/User')
+const ErrorResponse = require('../utils/errorResponse')
 
-// kenapa ini functionnya di export satu2 padahal dia bisa di export semua jadi satu module
 exports.register = async (req, res, next) => {
     const { username, email, password } = req.body
     try {
@@ -10,15 +9,9 @@ exports.register = async (req, res, next) => {
             email, 
             password,
         })
-        res.status(201).json({
-            success: true,
-            user
-        }) 
+        sendToken(user, 201, res)
     } catch (error) {
-        res.status(500).json({         
-            success: false,
-            error: error.message  
-        })
+        next(error)
     }
 }
 
@@ -26,25 +19,23 @@ exports.login = async (req, res, next) => {
     const { email, password } = req.body
 
     if(!email || !password){
-        res.status(400).json({ success: false, error: "Please provide email and password" })
+        return next( new ErrorResponse('Please provide email and password'), 401)
     }
 
     try{
         const user = await User.findOne({ email }).select("+password");
 
         if(!user) {
-            res.status(404).json({ success: false, error: "invalid credentials"})
+            return next( new ErrorResponse('Invalid credentials'), 401)
         }
 
-        const isMatch = await user.matchPassword(password)
+        const isMatch = await user.matchPassword(password);
+        
         if(!isMatch) {
-            res.status(404).json({success: false, error: "invalid credentials"})
+            return next( new ErrorResponse('Password does not match'), 404)
         }
 
-        res.status(200).json({
-            success: true,
-            token: "tr34f34443fc"
-        })
+        sendToken(user, 200, res)
 
     }catch (error) {
         res.status(500).json({success:false, error: error.message})
@@ -57,6 +48,13 @@ exports.forgotpassword = (req, res, next) => {
 
 exports.resetpassword = (req, res, next) => {
     res.send("reset password route")
+}
+
+
+
+const sendToken = (user, statusCode, res) => {
+    const token =  user.getSignedToken()
+    res.status(statusCode).json({success:true}, token)
 }
 
 
