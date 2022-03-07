@@ -1,34 +1,56 @@
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
+const validator = require('validator')
 
 
-const userSchema = new mongoose.Schema ({
-    username:{
-        type:String,
-        required: [true, "Please provide username"]
+const userSchema = new mongoose.Schema({
+    username: {
+        type: String,
+        required: [true, "Please provide username"],
+        unique: true,
+        trim: true,
+        minlength: [3, "Username must be at least 3 characters"],
+        maxlength: [20, "Username must be at most 20 characters"]
+
     },
     email: {
         type: String,
-        required: [true, "please provide a email"],
+        required: true,
         unique: true,
-        match: [
-            /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
-            "Please provide a valid email",
-          ],
+        trim: true,
+        lowercase: true,
+        validate(value) {
+            if (!validator.isEmail(value)) {
+                throw new Error('Email must be valid')
+            }
+        }
     },
     password: {
         type: String,
         required: [true, "please add password"],
         minlength: 8,
-        select: false
-    },
+        select: false,
+        trim: true,
+        validate(value) {
+            if (value.toLowerCase().includes('password')) {
+                throw new Error('Password must not contain "password"')
+            }
+        }
+
+    }, tokens: [{
+        token: {
+            type: String,
+            required: true
+        }
+    }]
+    ,
     resetPasswordToken: String,
     resertPasswordExpire: Date
 })
 
-userSchema.pre("save", async function(next) {
-    if(!this.isModified("password")) {
+userSchema.pre("save", async function (next) {
+    if (!this.isModified("password")) {
         next()
     }
     const salt = await bcrypt.genSalt(10)
@@ -38,12 +60,18 @@ userSchema.pre("save", async function(next) {
 
 userSchema.methods.matchPassword = async function (password) {
     return await bcrypt.compare(password, this.password);
-  };
+};
 
-userSchema.methods.getSignedToken = function () {
-    return jwt.sign( {id: this.id}, process.env.JWT_SECRET, { 
-        expiresIn: process.env.JWT_EXPIRES
-    })
+userSchema.methods.getSignedToken = async function () {
+    const user = this
+    const token = jwt.sign({ _id: user.id.toString() }, 'nodecourse',
+        { expiresIn: '1h' })
+
+    user.tokens = user.tokens.concat({ token })
+    await user.save()
+
+    return token
+
 }
 
 const User = mongoose.model("User", userSchema)

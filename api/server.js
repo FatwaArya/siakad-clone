@@ -1,4 +1,4 @@
-require('dotenv').config({ path: '../.env'})
+require('dotenv').config({ path: '../.env' })
 const express = require('express')
 const app = express()
 const PORT = process.env.PORT
@@ -11,7 +11,7 @@ app.use(express.json())
 
 app.use('/api/auth', require('./routes/auth'))
 
-app.use(errorHandler)
+// app.use(errorHandler)
 
 const server = app.listen(PORT, () => {
     console.log(`server running in port ${PORT}`)
